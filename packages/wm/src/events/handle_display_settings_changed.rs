@@ -74,8 +74,7 @@ pub fn handle_display_settings_changed(
     }
   }
 
-  // Sort monitors by position.
-  sort_monitors(&state.root_container)?;
+  sort_monitors(&state.root_container, &config.value.monitors)?;
 
   for new_monitor in new_monitors {
     move_bounded_workspaces_to_new_monitor(&new_monitor, state, config)?;
