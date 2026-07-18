@@ -31,7 +31,9 @@ use crate::{
   commands::{
     container::set_focused_descendant,
     general::platform_sync,
-    monitor::{add_monitor, move_bounded_workspaces_to_new_monitor},
+    monitor::{
+      add_monitor, move_bounded_workspaces_to_new_monitor, sort_monitors,
+    },
     window::{manage_window, unmanage_window},
   },
   models::{
@@ -132,14 +134,26 @@ impl WmState {
 
     // Create a monitor, and consequently a workspace, for each detected
     // native monitor.
+    let mut monitors = Vec::new();
+
     for native_display in self.dispatcher.sorted_displays()? {
       if let Ok(native_properties) =
         NativeMonitorProperties::try_from(&native_display)
       {
-        let monitor =
-          add_monitor(native_display, native_properties, self)?;
-        move_bounded_workspaces_to_new_monitor(&monitor, self, config)?;
+        monitors.push(add_monitor(
+          native_display,
+          native_properties,
+          self,
+        )?);
       }
+    }
+
+    // Apply the pinned monitor order from the `monitors` config before
+    // assigning workspaces, since `bind_to_monitor` matches by index.
+    sort_monitors(&self.root_container, &config.value.monitors)?;
+
+    for monitor in monitors {
+      move_bounded_workspaces_to_new_monitor(&monitor, self, config)?;
     }
 
     // Manage windows in reverse z-order (bottom to top). This helps to
