@@ -1,4 +1,8 @@
-use std::{collections::{HashMap, HashSet}, env, fs, path::PathBuf};
+use std::{
+  collections::{HashMap, HashSet},
+  env, fs,
+  path::PathBuf,
+};
 
 use anyhow::{Context, Result};
 use wm_common::{
