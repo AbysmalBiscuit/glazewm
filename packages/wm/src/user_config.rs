@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, fs, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, env, fs, path::PathBuf};
 
 use anyhow::{Context, Result};
 use wm_common::{
@@ -72,9 +72,29 @@ impl UserConfig {
 
     // TODO: Improve error formatting of serde_yaml errors. Something
     // similar to https://github.com/AlexanderThaller/format_serde_error
-    let config_value = serde_yaml::from_str(&config_str)?;
+    let config_value: ParsedConfig = serde_yaml::from_str(&config_str)?;
+    Self::validate(&config_value)?;
 
     Ok((config_value, config_str))
+  }
+
+  /// Validates semantic constraints that `serde` cannot express.
+  ///
+  /// Returns an error if the `monitors` config contains duplicate
+  /// machine IDs.
+  fn validate(config: &ParsedConfig) -> anyhow::Result<()> {
+    let mut machine_ids = HashSet::new();
+
+    for monitor_config in &config.monitors {
+      if !machine_ids.insert(&monitor_config.machine_id) {
+        anyhow::bail!(
+          "Duplicate machine ID '{}' in `monitors` config.",
+          monitor_config.machine_id
+        );
+      }
+    }
+
+    Ok(())
   }
 
   /// Initializes a new config file from the sample config resource.
@@ -376,5 +396,62 @@ impl UserConfig {
         true
       }
     })
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn config_without_monitors_block_parses() {
+    // An empty YAML document deserializes to null and fails for struct
+    // types, so use a minimal non-empty config.
+    let config: ParsedConfig = serde_yaml::from_str("gaps: {}").unwrap();
+    assert!(config.monitors.is_empty());
+  }
+
+  #[test]
+  fn config_with_monitors_block_parses_in_order() {
+    let yaml = r"
+monitors:
+  - machine_id: 'MSI3CA8#5&2fdae59&0&UID4352'
+  - machine_id: 'AOC2702#5&2fdae59&0&UID4354'
+";
+    let config: ParsedConfig = serde_yaml::from_str(yaml).unwrap();
+
+    assert_eq!(config.monitors.len(), 2);
+    assert_eq!(
+      config.monitors[0].machine_id,
+      "MSI3CA8#5&2fdae59&0&UID4352"
+    );
+    assert_eq!(
+      config.monitors[1].machine_id,
+      "AOC2702#5&2fdae59&0&UID4354"
+    );
+  }
+
+  #[test]
+  fn duplicate_machine_id_fails_validation() {
+    let yaml = r"
+monitors:
+  - machine_id: 'MSI3CA8#5&2fdae59&0&UID4352'
+  - machine_id: 'MSI3CA8#5&2fdae59&0&UID4352'
+";
+    let config: ParsedConfig = serde_yaml::from_str(yaml).unwrap();
+
+    assert!(UserConfig::validate(&config).is_err());
+  }
+
+  #[test]
+  fn unique_machine_ids_pass_validation() {
+    let yaml = r"
+monitors:
+  - machine_id: 'MSI3CA8#5&2fdae59&0&UID4352'
+  - machine_id: 'AOC2702#5&2fdae59&0&UID4354'
+";
+    let config: ParsedConfig = serde_yaml::from_str(yaml).unwrap();
+
+    assert!(UserConfig::validate(&config).is_ok());
   }
 }
