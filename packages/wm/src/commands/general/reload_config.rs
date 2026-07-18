@@ -7,7 +7,11 @@ use wm_common::{WindowRuleEvent, WmEvent};
 use wm_platform::NativeWindowWindowsExt;
 
 use crate::{
-  commands::{window::run_window_rules, workspace::sort_workspaces},
+  commands::{
+    monitor::{move_bounded_workspaces_to_new_monitor, sort_monitors},
+    window::run_window_rules,
+    workspace::sort_workspaces,
+  },
   traits::{CommonGetters, TilingSizeGetters, WindowGetters},
   user_config::UserConfig,
   wm::WindowManager,
@@ -26,6 +30,17 @@ pub fn reload_config(
 
   // Re-evaluate user config file and set its values in state.
   config.reload()?;
+
+  // Apply the pinned monitor order from the `monitors` config, and
+  // re-assign bound workspaces to match. This must run before any
+  // config-driven logic below that keys off monitor indices (e.g.
+  // `update_workspace_configs`), since pinned indices need to be in
+  // effect before `bind_to_monitor` re-assignment happens.
+  sort_monitors(&state.root_container, &config.value.monitors)?;
+
+  for monitor in state.monitors() {
+    move_bounded_workspaces_to_new_monitor(&monitor, state, config)?;
+  }
 
   // Re-run window rules on all active windows.
   for window in state.windows() {
