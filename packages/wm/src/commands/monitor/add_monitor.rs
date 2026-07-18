@@ -5,7 +5,9 @@ use wm_platform::Display;
 
 use crate::{
   commands::{
-    container::{attach_container, move_container_within_tree},
+    container::{
+      attach_container, move_container_within_tree, set_focused_descendant,
+    },
     workspace::{
       activate_workspace, deactivate_workspace, sort_workspaces,
     },
@@ -123,13 +125,19 @@ pub fn move_bounded_workspaces_to_new_monitor(
         ghost_names.contains(&workspace.config().name);
       let is_empty = !workspace.has_children();
       let is_keep_alive = workspace.config().keep_alive;
+      let is_displayed = workspace.monitor().is_some_and(|m| {
+        m.displayed_workspace()
+          .is_some_and(|w| w.id() == workspace.id())
+      });
 
       // Only clean up empty, non-keep-alive workspaces that weren't
-      // part of the ghost (i.e. were auto-created as backfill), and
-      // only if their monitor has other workspaces.
+      // part of the ghost (i.e. were auto-created as backfill) and
+      // aren't currently displayed on their monitor, and only if
+      // their monitor has other workspaces.
       if is_empty
         && !is_keep_alive
         && !is_ghost_workspace
+        && !is_displayed
         && workspace.monitor().is_some_and(|m| m.child_count() > 1)
       {
         deactivate_workspace(workspace, state)?;
@@ -142,10 +150,7 @@ pub fn move_bounded_workspaces_to_new_monitor(
       if let Some(ws) = state.workspace_by_name(&name) {
         if ws.monitor().is_some_and(|m| m.id() == monitor.id()) {
           let ws_container: Container = ws.into();
-          crate::commands::container::set_focused_descendant(
-            &ws_container,
-            None,
-          );
+          set_focused_descendant(&ws_container, None);
         }
       }
     }
