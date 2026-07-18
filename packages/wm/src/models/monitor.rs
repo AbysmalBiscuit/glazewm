@@ -130,6 +130,10 @@ impl Monitor {
       hardware_id: self.native_properties().hardware_id,
       #[cfg(not(target_os = "windows"))]
       hardware_id: None,
+      #[cfg(target_os = "windows")]
+      machine_id: self.native_properties().machine_id(),
+      #[cfg(not(target_os = "windows"))]
+      machine_id: None,
       working_rect: self.native_properties().working_area,
     }))
   }
