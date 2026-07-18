@@ -13,6 +13,7 @@ pub struct ParsedConfig {
   pub gaps: GapsConfig,
   pub general: GeneralConfig,
   pub keybindings: Vec<KeybindingConfig>,
+  pub monitors: Vec<MonitorConfig>,
   pub window_behavior: WindowBehaviorConfig,
   pub window_effects: WindowEffectsConfig,
   pub window_rules: Vec<WindowRuleConfig>,
@@ -385,6 +386,23 @@ pub struct WorkspaceConfig {
 
   #[serde(default = "default_bool::<false>")]
   pub keep_alive: bool,
+}
+
+/// Configuration for pinning a monitor to a fixed index.
+///
+/// The position of an entry in the top-level `monitors` list determines
+/// the index of the monitor it matches. Monitors without a matching
+/// entry are ordered after all matched ones, by physical position.
+///
+/// # Platform-specific
+///
+/// - Only supported on Windows; ignored with a warning on macOS.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct MonitorConfig {
+  /// Machine ID to match against a monitor (extracted from the device
+  /// path).
+  pub machine_id: String,
 }
 
 /// Helper function for setting a default value for a boolean field.
