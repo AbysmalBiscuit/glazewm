@@ -64,13 +64,19 @@ pub fn move_bounded_workspaces_to_new_monitor(
       state.workspace_by_name(&workspace_config.name);
 
     if let Some(existing_workspace) = existing_workspace {
-      // Move workspaces that should be bound to the newly added monitor.
-      move_workspace_to_monitor(
-        &existing_workspace,
-        monitor,
-        state,
-        config,
-      )?;
+      let already_here = existing_workspace
+        .monitor()
+        .is_some_and(|m| m.id() == monitor.id());
+
+      if !already_here {
+        // Move workspaces that should be bound to the newly added monitor.
+        move_workspace_to_monitor(
+          &existing_workspace,
+          monitor,
+          state,
+          config,
+        )?;
+      }
     } else if workspace_config.keep_alive {
       // Activate all `keep_alive` workspaces for this monitor.
       activate_workspace(
