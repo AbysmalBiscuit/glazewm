@@ -120,6 +120,15 @@ window_behavior:
       # Whether to show fullscreen windows as always on top.
       shown_on_top: false
 
+# Pin monitors to fixed indices by their machine ID (Windows-only).
+# The order of entries determines the index: the first entry is index 0.
+# Monitors not listed here are ordered after all listed ones, from
+# left-to-right by position. Run `glazewm query monitors` to find the
+# machine ID of each connected monitor.
+# monitors:
+#   - machine_id: 'MSI3CA8#5&2fdae59&0&UID4358'
+#   - machine_id: 'AOC2702#5&2fdae59&0&UID4354'
+
 workspaces:
   - name: '1'
   - name: '2'
