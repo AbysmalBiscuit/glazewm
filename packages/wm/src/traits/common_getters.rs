@@ -114,12 +114,19 @@ pub trait CommonGetters {
   }
 
   /// Children in order of last focus.
+  ///
+  /// Yields each existing child exactly once, skipping focus-order entries
+  /// that no longer resolve to a child.
   fn child_focus_order(&self) -> Box<dyn Iterator<Item = Container> + '_> {
-    let child_focus_order = self.borrow_child_focus_order();
+    let focus_order = self.borrow_child_focus_order().clone();
+    let mut index = 0;
 
     Box::new(std::iter::from_fn(move || {
-      for child_id in child_focus_order.iter() {
-        if let Some(child) = self.child_by_id(child_id) {
+      while index < focus_order.len() {
+        let child_id = focus_order[index];
+        index += 1;
+
+        if let Some(child) = self.child_by_id(&child_id) {
           return Some(child);
         }
       }
@@ -300,6 +307,18 @@ impl Iterator for Descendants {
   type Item = Container;
 
   fn next(&mut self) -> Option<Container> {
+    // Safety cap: a cyclic container tree makes this iterator grow its
+    // stack without bound. Real trees are tiny, so this cap only trips on
+    // a corrupt tree, where it logs and stops instead of exhausting RAM.
+    if self.stack.len() > 1_000_000 {
+      tracing::error!(
+        stack_len = self.stack.len(),
+        "Descendants iterator exceeded safety cap; container tree is cyclic.",
+      );
+      self.stack.clear();
+      return None;
+    }
+
     if let Some(container) = self.stack.pop_front() {
       self.stack.extend(container.children());
       return Some(container);
@@ -374,4 +393,32 @@ macro_rules! impl_common_getters {
       }
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::{models::Monitor, models::Workspace, traits::CommonGetters};
+
+  /// `child_focus_order` yields each existing child exactly once and then
+  /// terminates, rather than repeating the first child indefinitely.
+  #[test]
+  fn child_focus_order_is_finite() {
+    let monitor = Monitor::mock()
+      .workspaces(vec![
+        Workspace::mock().name("1".to_string()).call(),
+        Workspace::mock().name("2".to_string()).call(),
+        Workspace::mock().name("3".to_string()).call(),
+      ])
+      .call();
+
+    // Cap the pull so a non-advancing iterator can't hang the test.
+    let names: Vec<String> = monitor
+      .child_focus_order()
+      .take(10)
+      .filter_map(|c| c.as_workspace().cloned())
+      .map(|ws| ws.config().name)
+      .collect();
+
+    assert_eq!(names, vec!["1", "2", "3"]);
+  }
 }
